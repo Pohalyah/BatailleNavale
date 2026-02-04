@@ -2,6 +2,8 @@ package fr.afpa;
 
 import java.util.Random;
 import java.util.Scanner;
+import java.util.List;
+import java.util.ArrayList;
 import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.AnsiConsole;
 
@@ -144,13 +146,64 @@ public class BatailleNavale {
             grilleVisible[ligne][colonne] = "X";
             if (!resteBateau(grilleBateaux, ligne, colonne)) {
                 colorerCoule(grilleVisible, ligne, colonne);
-                System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("Coulé !").reset());
+                System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a(nomJoueur + " : Coulé !").reset());
             } else
-                System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a("Touché !").reset());
+                System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a(nomJoueur + " : Touché !").reset());
             return true;
         } else {
             grilleVisible[ligne][colonne] = "O";
-            System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).a("À l'eau !").reset());
+            System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).a(nomJoueur + " : À l'eau !").reset());
+            return false;
+        }
+    }
+
+    static int lastHitRow = -1;
+    static int lastHitCol = -1;
+    static List<int[]> targets = new ArrayList<>();
+
+    public static boolean jouerTourOrdinateur(String nom, String[][] grilleVisible, String[][] grilleBateaux) {
+        int ligne = -1;
+        int colonne = -1;
+
+        if (!targets.isEmpty()) {
+            int[] nextTarget = targets.remove(0);
+            ligne = nextTarget[0];
+            colonne = nextTarget[1];
+        } else {
+            do {
+                ligne = (int) (Math.random() * 10) + 1;
+                colonne = (int) (Math.random() * 10) + 1;
+            } while (!grilleVisible[ligne][colonne].equals("~"));
+        }
+
+        if (grilleBateaux[ligne][colonne].equals("B")) {
+            grilleBateaux[ligne][colonne] = "X";
+            grilleVisible[ligne][colonne] = "X";
+            System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a(nom + " : Touché !").reset());
+
+            if (!resteBateau(grilleBateaux, ligne, colonne)) {
+                colorerCoule(grilleVisible, ligne, colonne);
+                lastHitRow = -1;
+                lastHitCol = -1;
+                targets.clear();
+                System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a(nom + " : Coulé !").reset());
+            } else {
+                lastHitRow = ligne;
+                lastHitCol = colonne;
+                targets.clear();
+                if (ligne > 1 && grilleVisible[ligne - 1][colonne].equals("~"))
+                    targets.add(new int[] { ligne - 1, colonne });
+                if (ligne < 10 && grilleVisible[ligne + 1][colonne].equals("~"))
+                    targets.add(new int[] { ligne + 1, colonne });
+                if (colonne > 1 && grilleVisible[ligne][colonne - 1].equals("~"))
+                    targets.add(new int[] { ligne, colonne - 1 });
+                if (colonne < 10 && grilleVisible[ligne][colonne + 1].equals("~"))
+                    targets.add(new int[] { ligne, colonne + 1 });
+            }
+            return true;
+        } else {
+            grilleVisible[ligne][colonne] = "O";
+            System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).a(nom + " : À l'eau !").reset());
             return false;
         }
     }
@@ -178,6 +231,7 @@ public class BatailleNavale {
         placerBateaux(grilleBateauxJ2);
         int tirsRestants = 70;
         boolean tourJoueur1 = true;
+
         while (true) {
             boolean rejouer;
             if (tourJoueur1) {
@@ -188,25 +242,44 @@ public class BatailleNavale {
                         break;
                     }
                     tirsRestants--;
-                }
-                do {
-                    rejouer = jouerTourJoueur(scanner, "Tour du Joueur 1", grilleVisibleJ1, grilleBateauxJ2);
+                    do {
+                        rejouer = jouerTourJoueur(scanner, "Joueur", grilleVisibleJ2, grilleBateauxJ2);
+                        if (aGagne(grilleBateauxJ2))
+                            break;
+                    } while (rejouer && !aGagne(grilleBateauxJ2));
                     if (aGagne(grilleBateauxJ2))
                         break;
-                } while (rejouer && !aGagne(grilleBateauxJ2) && mode == 1);
-                if (aGagne(grilleBateauxJ2))
-                    break;
-            } else if (mode == 1) {
-                do {
-                    rejouer = jouerTourJoueur(scanner, "Tour du Joueur 2", grilleVisibleJ2, grilleBateauxJ1);
+                } else {
+                    do {
+                        rejouer = jouerTourJoueur(scanner, "Joueur 1", grilleVisibleJ2, grilleBateauxJ2);
+                        if (aGagne(grilleBateauxJ2))
+                            break;
+                    } while (rejouer && !aGagne(grilleBateauxJ2));
+                    if (aGagne(grilleBateauxJ2))
+                        break;
+                }
+            } else {
+                if (mode == 1) {
+                    do {
+                        rejouer = jouerTourJoueur(scanner, "Joueur 2", grilleVisibleJ1, grilleBateauxJ1);
+                        if (aGagne(grilleBateauxJ1))
+                            break;
+                    } while (rejouer && !aGagne(grilleBateauxJ1));
                     if (aGagne(grilleBateauxJ1))
                         break;
-                } while (rejouer && !aGagne(grilleBateauxJ1));
-                if (aGagne(grilleBateauxJ1))
-                    break;
+                } else {
+                    do {
+                        rejouer = jouerTourOrdinateur("Ordinateur", grilleVisibleJ1, grilleBateauxJ1);
+                        if (aGagne(grilleBateauxJ1))
+                            break;
+                    } while (rejouer && !aGagne(grilleBateauxJ1));
+                    if (aGagne(grilleBateauxJ1))
+                        break;
+                }
             }
             tourJoueur1 = !tourJoueur1;
         }
+
         System.out.println("Partie terminée");
     }
 }
